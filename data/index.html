@@ -1,0 +1,21 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP Monitor</title>
+  <script src="assets/script.js" defer></script>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="card">
+    <h1>Estado del Sensor</h1>
+    <p>Temperatura: <span class="value"><span id="temp">--</span>&deg;C</span></p>
+    <p>Humedad: <span class="value" id="hum">--</span>
+    <hr>
+    <h1>Control de LED</h1>
+    <p>El LED está: <span class="status" id="led-status">--</span></p>
+    <button class="btn btn-on"  onclick="setLed(1)">Encender</button>
+    <button class="btn btn-off" onclick="setLed(0)">Apagar</button>
+  </div>
+</body>
+</html>
