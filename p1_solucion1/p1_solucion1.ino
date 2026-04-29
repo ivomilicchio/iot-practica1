@@ -50,6 +50,8 @@ void setup() {
   });
 
   // WIFI MANAGER
+
+  // Manejo de nuevas credenciales
   wifiManager.setSaveConfigCallback([](){
     // Esta función se activa al cambiar las credenciales
     // Reinicia el ESP para que se inicialice correctamente el servidor web
@@ -57,6 +59,11 @@ void setup() {
       delay(2000); 
       ESP.restart(); 
   });
+
+  // Disparar AP cuando no hay WiFi por determinado tiempo
+  // Permite cambio de red
+
+  wifiManager.setConnectTimeout(20);
 
 
   Serial.println("Iniciando WiFiManager");
@@ -80,6 +87,41 @@ void setup() {
   Serial.println(WiFi.localIP());
 }
 
+unsigned long milisAnteriores = 0;
+const long intervaloReintento = 20000; // 20 segundos de espera
+bool modoPortalActivo = false;
+
 void loop() {
-  
+  // Verificamos el estado del WiFi cada 20 segundos
+  unsigned long milisActuales = millis();
+
+  if (milisActuales - milisAnteriores >= intervaloReintento) {
+    milisAnteriores = milisActuales;
+
+    if (WiFi.status() != WL_CONNECTED && !modoPortalActivo) {
+      Serial.println("¡Conexión perdida! Iniciando portal de rescate...");
+      
+      modoPortalActivo = true; // Evitamos que el loop intente abrir el portal varias veces
+
+      server.end();
+      delay(100);
+      
+      
+      // Configuramos un tiempo de espera (timeout)
+      // Si en 120 segundos nadie se conecta al portal, el ESP sigue con su loop
+      wifiManager.setConfigPortalTimeout(120);
+
+      // Abrimos el portal. Esta línea detiene el loop temporalmente hasta que:
+      // 1. Se configure una red exitosamente.
+      // 2. Se agote el tiempo (timeout).
+      if (!wifiManager.startConfigPortal("Rescate_ESP32", "password")) {
+        Serial.println("Portal cerrado por timeout. Reintentando en 20s...");
+        modoPortalActivo = false;
+      } else {
+        // Si llegamos aquí, el usuario configuró el WiFi con éxito
+        Serial.println("Reconectado!");
+        ESP.restart(); // Reiniciamos para limpiar el stack de red y arrancar el servidor
+      }
+    }
+  }
 }
