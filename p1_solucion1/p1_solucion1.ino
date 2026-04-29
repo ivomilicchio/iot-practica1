@@ -50,9 +50,9 @@ void setup() {
   });
 
   // WIFI MANAGER
-
-
   wifiManager.setSaveConfigCallback([](){
+    // Esta función se activa al cambiar las credenciales
+    // Reinicia el ESP para que se inicialice correctamente el servidor web
       Serial.println("Configuración guardada. Reiniciando en 2 segundos...");
       delay(2000); 
       ESP.restart(); 
