@@ -8,8 +8,9 @@ const int BAUD_RATE = 115200;
 const int LED_PIN = 2; 
 
 bool led_on = false;
-AsyncWebServer server(SERVER_PORT);
 WiFiManager wifiManager;
+AsyncWebServer server(SERVER_PORT);
+
 
 void setup() {
   Serial.begin(BAUD_RATE);
@@ -49,17 +50,31 @@ void setup() {
   });
 
   // WIFI MANAGER
+
+
+  wifiManager.setSaveConfigCallback([](){
+      Serial.println("Configuración guardada. Reiniciando en 2 segundos...");
+      delay(2000); 
+      ESP.restart(); 
+  });
+
+
   Serial.println("Iniciando WiFiManager");
   //wifiManager.resetSettings(); 
-  
-  if (!wifiManager.autoConnect("Portal_Config_ESP32")) {
-    Serial.println("Fallo en la conexión, reiniciando");
-    delay(3000);
-    ESP.restart();
+  bool res = wifiManager.autoConnect("Portal_Config_ESP32", "password");
+  if (!res) {
+    Serial.println("Fallo en la conexión");
+  } else {
+    Serial.print("WIFI GUARDADO? ");
+    Serial.println(wifiManager.getWiFiIsSaved());
+    Serial.println(wifiManager.getWiFiSSID());
+    Serial.println(wifiManager.getWiFiPass());
   }
+
 
   // INICIAR SERVIDOR
   server.begin();
+
   Serial.println("Servidor iniciado!");
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
