@@ -2,10 +2,16 @@
 #include <AsyncTCP.h>
 #include <LittleFS.h>
 #include <WiFiManager.h>
+#include <DHT.h>
 
 const int SERVER_PORT = 80;
 const int BAUD_RATE = 115200;
 const int LED_PIN = 2; 
+
+const int     DHT_PIN  = 22;
+const uint8_t DHT_TYPE = DHT11;
+
+DHT dht(DHT_PIN, DHT_TYPE);
 
 bool led_on = false;
 WiFiManager wifiManager;
@@ -15,6 +21,8 @@ AsyncWebServer server(SERVER_PORT);
 void setup() {
   Serial.begin(BAUD_RATE);
   pinMode(LED_PIN, OUTPUT);
+
+  dht.begin();
 
   // Montar LittleFS
   if (!LittleFS.begin(true)) {
@@ -42,8 +50,8 @@ void setup() {
 
   server.on("/data", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
     String json = "{";
-    json += "\"temp\":" + String(random(10, 30)) + ",";
-    json += "\"hum\":"  + String(random(10, 30)) + ",";
+    json += "\"temp\":" + String(dht.readTemperature()) + ",";
+    json += "\"hum\":"  + String(dht.readHumidity()) + ",";
     json += "\"led\":"  + String(led_on ? "true" : "false");
     json += "}";
     request->send(200, "application/json", json);
