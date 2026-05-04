@@ -1,50 +1,250 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
-  font-family: Arial;
-  text-align: center;
-  margin-top: 50px;
-  background-color: #f4f4f9;
+  font-family: 'Inter', Arial, sans-serif;
+  background: #f0f2f7;
+  color: #1a1d23;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.page-wrapper {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4361ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.header-text {
+  flex: 1;
+}
+
+.header-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a1d23;
+  line-height: 1.2;
+}
+
+.header-subtitle {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 500px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
-  border: 1px solid #ccc;
-  padding: 20px;
-  display: inline-block;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f1f3f8;
+  padding-bottom: 0.75rem;
+}
+
+.card-icon {
+  color: #4361ee;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.01em;
+}
+
+.metrics-grid {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.metric-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.metric-divider {
+  width: 1px;
+  background: #f1f3f8;
+  margin: 0 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.metric-value {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #4361ee;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-unit {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.update-hint {
+  font-size: 0.72rem;
+  color: #c0c7d4;
+  text-align: right;
+  margin-top: auto;
+}
+
+.led-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fc;
+  border: 1px solid #e9ecf3;
   border-radius: 10px;
-  background: white;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 0.7rem 1rem;
 }
 
-.value {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #007bff;
+.led-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d1d5db;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
 }
 
-.status {
-  font-weight: bold;
-  color: #555;
+.led-dot.on {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.led-dot.off {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.led-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.led-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-left: auto;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
 }
 
 .btn {
-  padding: 10px 20px;
-  font-size: 1rem;
+  flex: 1;
+  padding: 0.65rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 9px;
   border: none;
-  margin: 5px;
-  color: white;
-  text-decoration: none;
-  display: inline-block;
+  color: #fff;
+  transition: transform 0.1s ease, filter 0.15s ease;
+  letter-spacing: 0.01em;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn:active {
+  transform: scale(0.97);
 }
 
 .btn-on {
-  background-color: #28a745;
+  background: #22c55e;
 }
 
 .btn-off {
-  background-color: #dc3545;
-}
-
-.btn-update {
-  background-color: #6c757d;
+  background: #ef4444;
 }

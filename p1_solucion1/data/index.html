@@ -1,21 +1,121 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>ESP Monitor</title>
-  <script src="assets/script.js" defer></script>
-  <link rel="stylesheet" href="assets/styles.css">
-</head>
-<body>
-  <div class="card">
-    <h1>Estado del Sensor</h1>
-    <p>Temperatura: <span class="value"><span id="temp">--</span>&deg;C</span></p>
-    <p>Humedad: <span class="value" id="hum">--</span>
-    <hr>
-    <h1>Control de LED</h1>
-    <p>El LED está: <span class="status" id="led-status">--</span></p>
-    <button class="btn btn-on"  onclick="setLed(1)">Encender</button>
-    <button class="btn btn-off" onclick="setLed(0)">Apagar</button>
-  </div>
-</body>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Servidor Web ESP32</title>
+    <script src="assets/script.js" defer></script>
+    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="page-wrapper">
+      <header class="header">
+        <div class="header-icon">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        </div>
+        <div class="header-text">
+          <h1 class="header-title">Servidor Web Asincrónico</h1>
+          <p class="header-subtitle">Panel de control en tiempo real</p>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="card">
+          <div class="card-header">
+            <svg
+              class="card-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"
+              />
+            </svg>
+            <h2 class="card-title">Estado del Sensor</h2>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-block">
+              <span class="metric-label">Temperatura</span>
+              <div class="metric-value-row">
+                <span class="metric-value" id="temp">--</span>
+                <span class="metric-unit">°C</span>
+              </div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-block">
+              <span class="metric-label">Humedad</span>
+              <div class="metric-value-row">
+                <span class="metric-value" id="hum">--</span>
+                <span class="metric-unit">%</span>
+              </div>
+            </div>
+          </div>
+          <p class="update-hint">Actualización automática cada 5 segundos</p>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <svg
+              class="card-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <h2 class="card-title">Control de LED</h2>
+          </div>
+          <div class="led-status-row">
+            <span class="led-dot" id="led-dot"></span>
+            <span class="led-label">Estado actual:</span>
+            <span class="led-status" id="led-status">--</span>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-on" onclick="setLed(1)">Encender</button>
+            <button class="btn btn-off" onclick="setLed(0)">Apagar</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
 </html>
