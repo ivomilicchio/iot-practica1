@@ -3,132 +3,143 @@
 #include <LittleFS.h>
 #include <WiFiManager.h>
 #include <DHT.h>
+#include <InfluxDbClient.h>
+#include <InfluxDbCloud.h>
+
+// --- CONFIGURACIÓN INFLUXDB ---
+// Nota: En la nube, usualmente no se usa el puerto :8086 en la URL, se usa el estándar HTTPS
+#define INFLUXDB_URL "https://us-east-1-1.aws.cloud2.influxdata.com" 
+#define INFLUXDB_TOKEN "limXJwqE4gAztqRgZcJDwAbAj0C260Hpo2UUnI5rkC5ris9MBda4kZmLWBmX1WIrJ57IzmQ2nCv4nnIlbs6uLg=="
+#define INFLUXDB_ORG "ElPapuIoT"
+#define INFLUXDB_BUCKET "p1_dht11"
+#define TZ_INFO "UTC-3" 
+
+// Declaración del cliente (Solo la declaración aquí)
+InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
+
+Point sensorPoint("clima");
 
 const int SERVER_PORT = 80;
 const int BAUD_RATE = 115200;
 const int LED_PIN = 2; 
-
-const int     DHT_PIN  = 22;
+const int DHT_PIN = 22;
 const uint8_t DHT_TYPE = DHT11;
 
 DHT dht(DHT_PIN, DHT_TYPE);
-
 bool led_on = false;
 WiFiManager wifiManager;
 AsyncWebServer server(SERVER_PORT);
 
-
 void setup() {
   Serial.begin(BAUD_RATE);
   pinMode(LED_PIN, OUTPUT);
-
   dht.begin();
 
-  // Montar LittleFS
+  // --- CORRECCIÓN: Configuración del cliente dentro de una función ---
+  client.setInsecure(); 
+  // --- SINCRONIZACIÓN HORA (Crítico para InfluxDB Cloud) ---
+  timeSync(TZ_INFO, "pool.ntp.org", "time.nis.gov");
+
+  if (client.validateConnection()) {
+    Serial.println("Conectado a InfluxDB Cloud!");
+  } else {
+    Serial.print("Error InfluxDB: ");
+    Serial.println(client.getLastErrorMessage());
+  }
+
   if (!LittleFS.begin(true)) {
     Serial.println("LittleFS no pudo iniciarse.");
   }
 
-  // CONFIGURACION DE ENDPOINTS
+  // --- ENDPOINTS ---
   server.serveStatic("/assets/", LittleFS, "/assets/");
 
   server.on("/", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
     if (LittleFS.exists("/index.html")) {
       request->send(LittleFS, "/index.html", "text/html");
     } else {
-      request->send(404, "text/plain", "Archivo index.html no encontrado en LittleFS");
+      request->send(404, "text/plain", "Error: index.html no encontrado");
     }
-  });
-
-  server.on("/update", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
-    if (request->hasParam("led_state")) {
-      led_on = request->getParam("led_state")->value() == "1";
-      digitalWrite(LED_PIN, led_on ? HIGH : LOW);
-    }
-    request->send(200, "application/json", "{\"led\":" + String(led_on ? "true" : "false") + "}");
   });
 
   server.on("/data", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
-    String json = "{";
-    json += "\"temp\":" + String(dht.readTemperature()) + ",";
-    json += "\"hum\":"  + String(dht.readHumidity()) + ",";
-    json += "\"led\":"  + String(led_on ? "true" : "false");
-    json += "}";
+    String json = "{\"temp\":" + String(dht.readTemperature()) + 
+                  ",\"hum\":" + String(dht.readHumidity()) + 
+                  ",\"led\":" + String(led_on ? "true" : "false") + "}";
     request->send(200, "application/json", json);
   });
 
-  // WIFI MANAGER
+  server.on("/history", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
+    String query = "from(bucket: \"" + String(INFLUXDB_BUCKET) + "\") "
+                   "|> range(start: -1h) "
+                   "|> filter(fn: (r) => r._measurement == \"clima\") "
+                   "|> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") "
+                   "|> limit(n:10)";
+    
+    FluxQueryResult result = client.query(query);
+    String jsonOutput = "[";
+    while (result.next()) {
+        if (jsonOutput != "[") jsonOutput += ",";
+        jsonOutput += "{\"timestamp\":\"" + result.getValueByName("_time").getDateTime().format("%Y-%m-%d %H:%M:%S") + "\",";
+        jsonOutput += "\"temp\":" + String(result.getValueByName("temperatura").getDouble()) + ",";
+        jsonOutput += "\"hum\":" + String(result.getValueByName("humedad").getDouble()) + "}";
+    }
+    jsonOutput += "]";
+    result.close();
+    request->send(200, "application/json", jsonOutput);
+  });
 
-  // Manejo de nuevas credenciales
+  // --- WIFI ---
   wifiManager.setSaveConfigCallback([](){
-    // Esta función se activa al cambiar las credenciales
-    // Reinicia el ESP para que se inicialice correctamente el servidor web
-      Serial.println("Configuración guardada. Reiniciando en 2 segundos...");
+      Serial.println("Reiniciando...");
       delay(2000); 
       ESP.restart(); 
   });
 
-  // Disparar AP cuando no hay WiFi por determinado tiempo
-  // Permite cambio de red
-
   wifiManager.setConnectTimeout(20);
-
-
-  Serial.println("Iniciando WiFiManager");
-  //wifiManager.resetSettings(); 
-  bool res = wifiManager.autoConnect("Portal_Config_ESP32", "password");
-  if (!res) {
-    Serial.println("Fallo en la conexión");
-  } else {
-    Serial.print("WIFI GUARDADO? ");
-    Serial.println(wifiManager.getWiFiIsSaved());
-    Serial.println(wifiManager.getWiFiSSID());
-    Serial.println(wifiManager.getWiFiPass());
+  if (!wifiManager.autoConnect("Portal_Config_ESP32", "password")) {
+    Serial.println("Fallo conexión");
   }
 
 
-  // INICIAR SERVIDOR
   server.begin();
-
-  Serial.println("Servidor iniciado!");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
 }
 
 unsigned long milisAnteriores = 0;
-const long intervaloReintento = 20000; // 20 segundos de espera
+const long intervaloReintento = 20000;
 bool modoPortalActivo = false;
 
 void loop() {
-  // Verificamos el estado del WiFi cada 20 segundos
-  unsigned long milisActuales = millis();
-
-  if (milisActuales - milisAnteriores >= intervaloReintento) {
-    milisAnteriores = milisActuales;
-
+  if (millis() - milisAnteriores >= intervaloReintento) {
+    milisAnteriores = millis();
     if (WiFi.status() != WL_CONNECTED && !modoPortalActivo) {
-      Serial.println("¡Conexión perdida! Iniciando portal de rescate...");
-      
-      modoPortalActivo = true; // Evitamos que el loop intente abrir el portal varias veces
-
+      modoPortalActivo = true;
       server.end();
-      delay(100);
-      
-      
-      // Configuramos un tiempo de espera (timeout)
-      // Si en 120 segundos nadie se conecta al portal, el ESP sigue con su loop
       wifiManager.setConfigPortalTimeout(120);
-
-      // Abrimos el portal. Esta línea detiene el loop temporalmente hasta que:
-      // 1. Se configure una red exitosamente.
-      // 2. Se agote el tiempo (timeout).
       if (!wifiManager.startConfigPortal("Rescate_ESP32", "password")) {
-        Serial.println("Portal cerrado por timeout. Reintentando en 20s...");
         modoPortalActivo = false;
       } else {
-        // Si llegamos aquí, el usuario configuró el WiFi con éxito
-        Serial.println("Reconectado!");
-        ESP.restart(); // Reiniciamos para limpiar el stack de red y arrancar el servidor
+        ESP.restart();
+      }
+    }
+  }
+
+  static unsigned long lastDbWrite = 0;
+  if (millis() - lastDbWrite > 30000) { 
+    lastDbWrite = millis();
+    
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+
+    if(!isnan(t) && !isnan(h)) {
+      sensorPoint.clearFields();
+      sensorPoint.addField("temperatura", t); 
+      sensorPoint.addField("humedad", h);
+      sensorPoint.addTag("device", "ESP32_Portatil");
+
+      if (!client.writePoint(sensorPoint)) {
+        Serial.print("Error escritura InfluxDB: ");
+        Serial.println(client.getLastErrorMessage());
       }
     }
   }
