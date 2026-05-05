@@ -5,40 +5,45 @@
 #include <DHT.h>
 #include <InfluxDbClient.h>
 #include <InfluxDbCloud.h>
+#include <ArduinoJson.h>
 
-// --- CONFIGURACIÓN INFLUXDB ---
-// Nota: En la nube, usualmente no se usa el puerto :8086 en la URL, se usa el estándar HTTPS
-#define INFLUXDB_URL "https://us-east-1-1.aws.cloud2.influxdata.com/" 
-#define INFLUXDB_TOKEN "limXJwqE4gAztqRgZcJDwAbAj0C260Hpo2UUnI5rkC5ris9MBda4kZmLWBmX1WIrJ57IzmQ2nCv4nnIlbs6uLg=="
-#define INFLUXDB_ORG "ElPapuIoT"
-#define INFLUXDB_BUCKET "p1_monitor"
-#define TZ_INFO "UTC-3" 
+const char* INFLUXDB_URL = "https://us-east-1-1.aws.cloud2.influxdata.com/";
+const char* INFLUXDB_TOKEN = "limXJwqE4gAztqRgZcJDwAbAj0C260Hpo2UUnI5rkC5ris9MBda4kZmLWBmX1WIrJ57IzmQ2nCv4nnIlbs6uLg==";
+const char* INFLUXDB_ORG = "ElPapuIoT";
+const char* INFLUXDB_BUCKET = "p1_monitor";
+const char* TZ_INFO = "UTC-3";
 
-// Declaración del cliente (Solo la declaración aquí)
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
 
 Point sensorPoint("clima");
 
 const int SERVER_PORT = 80;
 const int BAUD_RATE = 115200;
+
 const int LED_PIN = 2; 
+bool led_on = false;
+
 const int DHT_PIN = 22;
 const uint8_t DHT_TYPE = DHT11;
-
 DHT dht(DHT_PIN, DHT_TYPE);
-bool led_on = false;
+
+
 WiFiManager wifiManager;
 AsyncWebServer server(SERVER_PORT);
+
+void sendJson(AsyncWebServerRequest *request, JsonDocument &doc) {
+  AsyncResponseStream *response = request->beginResponseStream("application/json");
+  serializeJson(doc, *response);
+  request->send(response);
+}
 
 void setup() {
   Serial.begin(BAUD_RATE);
   pinMode(LED_PIN, OUTPUT);
-  //dht.begin();
+  dht.begin();
 
-
-  // --- CORRECCIÓN: Configuración del cliente dentro de una función ---
   client.setInsecure(); 
-  // --- SINCRONIZACIÓN HORA (Crítico para InfluxDB Cloud) ---
+
   timeSync(TZ_INFO, "pool.ntp.org", "time.nis.gov");
   sensorPoint.addTag("device", "ESP32_Portatil");
   
@@ -51,8 +56,6 @@ void setup() {
     Serial.print("Error InfluxDB: ");
     Serial.println(client.getLastErrorMessage());
   }
-
-  
 
   Serial.println("Inicializando LittleFS...");
   if (!LittleFS.begin(true)) {
@@ -70,38 +73,53 @@ void setup() {
     }
   });
 
-  server.on("/data", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
-    String json = "{\"temp\":" + String(dht.readTemperature()) + 
-                  ",\"hum\":" + String(dht.readHumidity()) + 
-                  ",\"led\":" + String(led_on ? "true" : "false") + "}";
-    request->send(200, "application/json", json);
+  server.on("/update", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("led_state")) {
+        led_on = request->getParam("led_state")->value() == "1";
+        digitalWrite(LED_PIN, led_on ? HIGH : LOW);
+    }
+
+    JsonDocument doc;
+    doc["led"] = led_on;
+    sendJson(request, doc);
   });
 
-  server.on("/history", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/data", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    doc["temp"] = dht.readTemperature();
+    doc["hum"]  = dht.readHumidity();
+    doc["led"]  = led_on;
+    sendJson(request, doc);
+  });
+
+  server.on("/history", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request) {
     String query = "from(bucket: \"" + String(INFLUXDB_BUCKET) + "\") "
                    "|> range(start: -1h) "
                    "|> filter(fn: (r) => r._measurement == \"clima\") "
                    "|> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") "
                    "|> limit(n:10)";
-    
+
     FluxQueryResult result = client.query(query);
-    String jsonOutput = "[";
+
+    JsonDocument doc;
+    JsonArray array = doc.to<JsonArray>();
+
     while (result.next()) {
-        if (jsonOutput != "[") jsonOutput += ",";
-        jsonOutput += "{\"timestamp\":\"" + result.getValueByName("_time").getDateTime().format("%Y-%m-%d %H:%M:%S") + "\",";
-        jsonOutput += "\"temp\":" + String(result.getValueByName("temperatura").getDouble()) + ",";
-        jsonOutput += "\"hum\":" + String(result.getValueByName("humedad").getDouble()) + "}";
+      JsonObject entry = array.add<JsonObject>();
+      entry["timestamp"] = result.getValueByName("_time").getDateTime().format("%Y-%m-%d %H:%M:%S");
+      entry["temp"]      = result.getValueByName("temperatura").getDouble();
+      entry["hum"]       = result.getValueByName("humedad").getDouble();
     }
-    jsonOutput += "]";
     result.close();
-    request->send(200, "application/json", jsonOutput);
+
+    sendJson(request, doc);
   });
 
   // --- WIFI ---
   wifiManager.setSaveConfigCallback([](){
-      Serial.println("Reiniciando dispositivo...");
-      delay(2000); 
-      ESP.restart(); 
+    Serial.println("Reiniciando dispositivo...");
+    delay(2000); 
+    ESP.restart(); 
   });
 
   wifiManager.setConnectTimeout(20);
@@ -114,19 +132,19 @@ void setup() {
   Serial.println("Servidor iniciado");
 }
 
-unsigned long milisAnteriores = 0;
-const long intervaloReintento = 20000;
-bool modoPortalActivo = false;
+unsigned long previousMillis = 0;
+const long retryInterval = 20000;
+bool isConfigPortalActive = false;
 
 void loop() {
-  if (millis() - milisAnteriores >= intervaloReintento) {
-    milisAnteriores = millis();
-    if (WiFi.status() != WL_CONNECTED && !modoPortalActivo) {
-      modoPortalActivo = true;
+  if (millis() - previousMillis >= retryInterval) {
+    previousMillis = millis();
+    if (WiFi.status() != WL_CONNECTED && !isConfigPortalActive) {
+      isConfigPortalActive = true;
       server.end();
       wifiManager.setConfigPortalTimeout(120);
       if (!wifiManager.startConfigPortal("Rescate_ESP32", "password")) {
-        modoPortalActivo = false;
+        isConfigPortalActive = false;
       } else {
         ESP.restart();
       }
@@ -137,12 +155,8 @@ void loop() {
   if (millis() - lastDbWrite > 30000) { 
     lastDbWrite = millis();
     
-    /*
     float t = dht.readTemperature();
     float h = dht.readHumidity();
-    */
-    float t = random(10.0, 30.0);
-    float h = random(40.0, 60.0);
     
     if(!isnan(t) && !isnan(h)) {
       sensorPoint.clearFields();
