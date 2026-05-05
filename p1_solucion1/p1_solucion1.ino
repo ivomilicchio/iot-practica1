@@ -8,10 +8,10 @@
 
 // --- CONFIGURACIÓN INFLUXDB ---
 // Nota: En la nube, usualmente no se usa el puerto :8086 en la URL, se usa el estándar HTTPS
-#define INFLUXDB_URL "https://us-east-1-1.aws.cloud2.influxdata.com" 
+#define INFLUXDB_URL "https://us-east-1-1.aws.cloud2.influxdata.com/" 
 #define INFLUXDB_TOKEN "limXJwqE4gAztqRgZcJDwAbAj0C260Hpo2UUnI5rkC5ris9MBda4kZmLWBmX1WIrJ57IzmQ2nCv4nnIlbs6uLg=="
 #define INFLUXDB_ORG "ElPapuIoT"
-#define INFLUXDB_BUCKET "p1_dht11"
+#define INFLUXDB_BUCKET "p1_monitor"
 #define TZ_INFO "UTC-3" 
 
 // Declaración del cliente (Solo la declaración aquí)
@@ -33,20 +33,28 @@ AsyncWebServer server(SERVER_PORT);
 void setup() {
   Serial.begin(BAUD_RATE);
   pinMode(LED_PIN, OUTPUT);
-  dht.begin();
+  //dht.begin();
+
 
   // --- CORRECCIÓN: Configuración del cliente dentro de una función ---
   client.setInsecure(); 
   // --- SINCRONIZACIÓN HORA (Crítico para InfluxDB Cloud) ---
   timeSync(TZ_INFO, "pool.ntp.org", "time.nis.gov");
-
+  sensorPoint.addTag("device", "ESP32_Portatil");
+  
+  Serial.println("Intentando conectarse a InfluxDB Cloud...");
   if (client.validateConnection()) {
     Serial.println("Conectado a InfluxDB Cloud!");
+    Serial.println(client.getServerUrl());
+
   } else {
     Serial.print("Error InfluxDB: ");
     Serial.println(client.getLastErrorMessage());
   }
 
+  
+
+  Serial.println("Inicializando LittleFS...");
   if (!LittleFS.begin(true)) {
     Serial.println("LittleFS no pudo iniciarse.");
   }
@@ -91,7 +99,7 @@ void setup() {
 
   // --- WIFI ---
   wifiManager.setSaveConfigCallback([](){
-      Serial.println("Reiniciando...");
+      Serial.println("Reiniciando dispositivo...");
       delay(2000); 
       ESP.restart(); 
   });
@@ -101,8 +109,9 @@ void setup() {
     Serial.println("Fallo conexión");
   }
 
-
+  Serial.println("Inicializando servidor...");
   server.begin();
+  Serial.println("Servidor iniciado");
 }
 
 unsigned long milisAnteriores = 0;
@@ -128,14 +137,20 @@ void loop() {
   if (millis() - lastDbWrite > 30000) { 
     lastDbWrite = millis();
     
+    /*
     float t = dht.readTemperature();
     float h = dht.readHumidity();
-
+    */
+    float t = random(10.0, 30.0);
+    float h = random(40.0, 60.0);
+    
     if(!isnan(t) && !isnan(h)) {
       sensorPoint.clearFields();
       sensorPoint.addField("temperatura", t); 
       sensorPoint.addField("humedad", h);
-      sensorPoint.addTag("device", "ESP32_Portatil");
+
+      Serial.print("Writing: ");
+      Serial.println(client.pointToLineProtocol(sensorPoint));
 
       if (!client.writePoint(sensorPoint)) {
         Serial.print("Error escritura InfluxDB: ");
