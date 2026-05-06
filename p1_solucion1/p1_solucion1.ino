@@ -115,6 +115,12 @@ void setup() {
     sendJson(request, doc);
   });
 
+  // Redirecciona directamente al dashboard de grafana
+  server.on("/api/metrics", WebRequestMethod::HTTP_GET, [](AsyncWebServerRequest *request){
+    String localGrafanaUrl = "http://localhost:3000/d-solo/adklczv/p1-iot?orgId=1&refresh=5s&from=1778049656915&to=1778071256915&timezone=browser&panelId=panel-1";
+    request->redirect(localGrafanaUrl);
+  });
+
   // --- WIFI ---
   wifiManager.setSaveConfigCallback([](){
     Serial.println("Reiniciando dispositivo...");
@@ -130,7 +136,7 @@ void setup() {
   Serial.println("Inicializando servidor...");
   server.begin();
   Serial.println("Servidor iniciado");
-}
+
 
 unsigned long previousMillis = 0;
 const long retryInterval = 20000;
