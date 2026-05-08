@@ -137,7 +137,7 @@ void setup() {
   server.begin();
   Serial.println("Servidor iniciado");
 
-
+}
 unsigned long previousMillis = 0;
 const long retryInterval = 20000;
 bool isConfigPortalActive = false;
